@@ -201,8 +201,27 @@ do
         exit 1
     fi
 
+    set +e
+    pushres=$(git push --set-upstream origin "${DATA_BRANCH_NAME}")
+    PUSH_ECODE=$?
+    set -e
 
-    # Do a pull right before the push, they should be looked at as an 'atomic
+    set +x
+
+    if [ $PUSH_ECODE -ne 0 ]; then
+        if grep -fq "rejected.*fetch first" <<< "$pushres" ; then
+            echo "warn: git push returned with code ${PUSH_ECODE}, retry soon"
+        else
+            echo "error: push failed."
+            echo "$pushres"
+            exit 1
+        fi
+    else
+        echo "pull/push loop: push succeeded, leave loop"
+        break
+    fi
+
+    # Do a pull right before the next push, they should be looked at as an 'atomic
     # unit', doing them right after one another is the recipe for long-term
     # convergence here -- of course that means that even the first push is
     # quite likely to succeed. Not sure if more than 1 loop iteration will
@@ -223,8 +242,8 @@ do
         break
     fi
 
-    echo "pull/push loop:sleep for 10 s"
-    sleep 10
+    echo "pull/push loop:sleep for 5 s"
+    sleep 5
 done
 
 echo "finished"
